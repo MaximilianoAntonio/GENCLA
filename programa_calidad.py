@@ -3,11 +3,27 @@ import pandas as pd
 import numpy as np
 import json
 import uuid
+import copy
 import streamlit.components.v1 as components
 
 def render_echarts(option, height=500, key_prefix="echart"):
+    option_render = copy.deepcopy(option)
+    option_render.setdefault("toolbox", {
+        "show": True,
+        "right": 10,
+        "top": 10,
+        "feature": {
+            "saveAsImage": {
+                "show": True,
+                "type": "png",
+                "name": "grafico_dashboard",
+                "pixelRatio": 2
+            }
+        }
+    })
+
     chart_id = f"{key_prefix}_{uuid.uuid4().hex}"
-    options_json = json.dumps(option, ensure_ascii=False)
+    options_json = json.dumps(option_render, ensure_ascii=False)
     html = f"""
     <div id=\"{chart_id}\" style=\"width:100%;height:{height}px;\"></div>
     <script src=\"https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js\"></script>
@@ -190,6 +206,7 @@ if archivo_subido is not None:
         nivel_tiempo_col = "Sin transformación"
         nivel_tiempo_col_sec = "Sin transformación"
         ordenar_cronologico = True
+        filtros_categorias = {}
 
         def es_columna_tiempo(serie):
             if pd.api.types.is_datetime64_any_dtype(serie):
@@ -320,8 +337,34 @@ if archivo_subido is not None:
             mostrar_zoom = st.checkbox("Zoom interactivo", value=True)
             ordenar_cronologico = st.checkbox("Orden cronológico en campos de tiempo", value=True)
 
+            st.markdown("##### Categorización")
+            columnas_filtro = st.multiselect(
+                "Columnas para filtrar datos del gráfico:",
+                options=columnas_dimensiones,
+                key="cols_filtro_dashboard"
+            )
+            for col_fil in columnas_filtro:
+                valores_fil = sorted(df[col_fil].dropna().astype(str).unique().tolist())
+                seleccion_fil = st.multiselect(
+                    f"Valores de {col_fil}:",
+                    options=valores_fil,
+                    key=f"valores_filtro_{col_fil}"
+                )
+                if seleccion_fil:
+                    filtros_categorias[col_fil] = seleccion_fil
+
         with panel_visual:
             st.markdown("#### Visual")
+
+            df_plot = df.copy()
+            for col_fil, valores_fil in filtros_categorias.items():
+                df_plot = df_plot[df_plot[col_fil].astype(str).isin(valores_fil)]
+
+            st.caption(f"Filas disponibles para el visual: {len(df_plot):,} de {len(df):,}")
+
+            if len(df_plot) == 0:
+                st.warning("No hay datos con los filtros de categorización seleccionados. Ajusta los filtros para continuar.")
+                st.stop()
 
             palette = [
                 "#FF6B6B", "#4ECDC4", "#FFD93D", "#5D5FEF", "#F97F51",
@@ -332,7 +375,7 @@ if archivo_subido is not None:
                 if not hist_col:
                     st.info("Selecciona una columna numérica para construir el histograma.")
                 else:
-                    serie_valores = df[hist_col].dropna().astype(float)
+                    serie_valores = df_plot[hist_col].dropna().astype(float)
                     conteos, bordes = np.histogram(serie_valores, bins=hist_bins)
                     categorias = [f"{bordes[i]:.2f} - {bordes[i+1]:.2f}" for i in range(len(conteos))]
                     valores = conteos.tolist()
@@ -360,7 +403,7 @@ if archivo_subido is not None:
                 if not scatter_x or not scatter_y:
                     st.info("Selecciona dos columnas numéricas para construir la dispersión.")
                 else:
-                    datos = df[[scatter_x, scatter_y, scatter_color]].copy() if scatter_color != "-- Ninguno --" else df[[scatter_x, scatter_y]].copy()
+                    datos = df_plot[[scatter_x, scatter_y, scatter_color]].copy() if scatter_color != "-- Ninguno --" else df_plot[[scatter_x, scatter_y]].copy()
                     datos = datos.dropna()
                     if scatter_color != "-- Ninguno --":
                         datos[scatter_color] = datos[scatter_color].astype(str)
@@ -400,7 +443,7 @@ if archivo_subido is not None:
                         st.dataframe(datos, use_container_width=True)
 
             else:
-                df_vis = df.copy()
+                df_vis = df_plot.copy()
 
                 def aplicar_nivel_tiempo(df_base, columna, nivel):
                     if columna == "-- Ninguno --" or nivel == "Sin transformación":
