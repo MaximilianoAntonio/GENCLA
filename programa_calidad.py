@@ -220,6 +220,11 @@ if archivo_subido is not None:
 
         mostrar_zoom = st.checkbox("Activar zoom interactivo", value=True)
 
+        palette = [
+            "#FF6B6B", "#4ECDC4", "#FFD93D", "#5D5FEF", "#F97F51",
+            "#1B9CFC", "#F7B731", "#2ED573", "#9B59B6", "#F39C12"
+        ]
+
         df_vis = df.copy()
         df_vis[col_principal] = df_vis[col_principal].fillna("Sin dato").astype(str)
         if col_desglose != "-- Ninguno --":
@@ -247,8 +252,13 @@ if archivo_subido is not None:
                 if tipo_grafico in ["Pie", "Dona"]:
                     radio = ["40%", "70%"] if tipo_grafico == "Dona" else "65%"
                     option = {
-                        "tooltip": {"trigger": "item"},
-                        "legend": {"orient": "vertical", "left": "left"},
+                        "color": palette,
+                        "tooltip": {
+                            "trigger": "item",
+                            "backgroundColor": "rgba(0,0,0,0.8)",
+                            "textStyle": {"color": "#FFFFFF"}
+                        },
+                        "legend": {"orient": "vertical", "left": "left", "textStyle": {"color": "#FFFFFF"}},
                         "series": [{
                             "name": metrica,
                             "type": "pie",
@@ -260,9 +270,23 @@ if archivo_subido is not None:
                 else:
                     tipo_serie = "bar" if tipo_grafico == "Barras" else "line"
                     option = {
-                        "tooltip": {"trigger": "axis"},
-                        "xAxis": {"type": "category", "data": categorias, "axisLabel": {"rotate": 25}},
-                        "yAxis": {"type": "value"},
+                        "color": palette,
+                        "tooltip": {
+                            "trigger": "axis",
+                            "backgroundColor": "rgba(0,0,0,0.8)",
+                            "textStyle": {"color": "#FFFFFF"}
+                        },
+                        "xAxis": {
+                            "type": "category",
+                            "data": categorias,
+                            "axisLabel": {"rotate": 25, "color": "#FFFFFF"},
+                            "axisLine": {"lineStyle": {"color": "#FFFFFF"}}
+                        },
+                        "yAxis": {
+                            "type": "value",
+                            "axisLabel": {"color": "#FFFFFF"},
+                            "axisLine": {"lineStyle": {"color": "#FFFFFF"}}
+                        },
                         "series": [{
                             "name": metrica,
                             "type": tipo_serie,
@@ -306,10 +330,25 @@ if archivo_subido is not None:
                     st.warning("Pie y Dona no aplican bien para datos desagregados. Se mostrará Barras apiladas.")
 
                 option = {
-                    "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
-                    "legend": {"top": 10},
-                    "xAxis": {"type": "category", "data": [str(v) for v in tabla_top.index], "axisLabel": {"rotate": 25}},
-                    "yAxis": {"type": "value"},
+                    "color": palette,
+                    "tooltip": {
+                        "trigger": "axis",
+                        "axisPointer": {"type": "shadow"},
+                        "backgroundColor": "rgba(0,0,0,0.8)",
+                        "textStyle": {"color": "#FFFFFF"}
+                    },
+                    "legend": {"top": 10, "textStyle": {"color": "#FFFFFF"}},
+                    "xAxis": {
+                        "type": "category",
+                        "data": [str(v) for v in tabla_top.index],
+                        "axisLabel": {"rotate": 25, "color": "#FFFFFF"},
+                        "axisLine": {"lineStyle": {"color": "#FFFFFF"}}
+                    },
+                    "yAxis": {
+                        "type": "value",
+                        "axisLabel": {"color": "#FFFFFF"},
+                        "axisLine": {"lineStyle": {"color": "#FFFFFF"}}
+                    },
                     "series": []
                 }
 
