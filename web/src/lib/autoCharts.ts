@@ -1,6 +1,8 @@
 import { DataProfile, DataRecord } from "./dataTypes";
 import { aggregateBy, buildBoxplot, buildHeatmap, buildScatter, Metric } from "./chartUtils";
 import { buildColumnStats } from "./dataUtils";
+import { getPalette } from "./chartPalettes";
+import { applyChartTheme, ChartTheme } from "./chartTheme";
 import { TimeLevel } from "./timeUtils";
 
 export type AutoChartType =
@@ -40,18 +42,10 @@ export interface AutoChartView {
   table?: Record<string, string | number>[];
 }
 
-const palette = [
-  "#5d5fef",
-  "#4ecdc4",
-  "#ff6b6b",
-  "#ffd93d",
-  "#f97f51",
-  "#1b9cfc",
-  "#2ed573",
-  "#f7b731",
-  "#9b59b6",
-  "#f39c12"
-];
+interface AutoChartBuildOptions {
+  palette?: string[];
+  theme?: ChartTheme;
+}
 
 // Clinical-domain keyword detection
 const CLINICAL_KEYWORDS = {
@@ -207,7 +201,13 @@ export function recommendAutoCharts(
   return charts.slice(0, limit);
 }
 
-export function buildAutoChartView(records: DataRecord[], config: AutoChartConfig): AutoChartView | null {
+export function buildAutoChartView(
+  records: DataRecord[],
+  config: AutoChartConfig,
+  options: AutoChartBuildOptions = {}
+): AutoChartView | null {
+  const palette = options.palette ?? getPalette("Predeterminada");
+  const theme = options.theme;
   // Heatmap
   if (config.chartType === "Heatmap" && config.rowField && config.colField) {
     const result = buildHeatmap(records, config.rowField, config.colField, "Conteo", undefined, config.topN ?? 12);
@@ -221,7 +221,8 @@ export function buildAutoChartView(records: DataRecord[], config: AutoChartConfi
       visualMap: { min: 0, max: result.maxValue, calculable: true, orient: "horizontal", left: "center", bottom: 0, inRange: { color: ["#e0f3ff", "#0f766e"] } },
       series: [{ type: "heatmap", data: result.data, label: { show: result.rowLabels.length <= 8, fontSize: 10 } }]
     };
-    return { config, option, insights: [`Cruce de ${result.rowLabels.length} filas × ${result.colLabels.length} columnas. Celdas más oscuras = mayor concentración.`] };
+    const themedOption = theme ? applyChartTheme(option, theme) : option;
+    return { config, option: themedOption, insights: [`Cruce de ${result.rowLabels.length} filas × ${result.colLabels.length} columnas. Celdas más oscuras = mayor concentración.`] };
   }
 
   // Boxplot
@@ -235,7 +236,8 @@ export function buildAutoChartView(records: DataRecord[], config: AutoChartConfi
       yAxis: { type: "value", name: config.valueColumn },
       series: [{ type: "boxplot", data: result.series }]
     };
-    return { config, option, insights: buildInsights(result.categories, result.series.map(s => s[2]), "Boxplot") };
+    const themedOption = theme ? applyChartTheme(option, theme) : option;
+    return { config, option: themedOption, insights: buildInsights(result.categories, result.series.map(s => s[2]), "Boxplot") };
   }
 
   // Scatter
@@ -248,7 +250,8 @@ export function buildAutoChartView(records: DataRecord[], config: AutoChartConfi
       yAxis: { type: "value", name: config.yKey },
       series: series.map((item) => ({ name: item.name, type: "scatter", data: item.data, symbolSize: 7 }))
     };
-    return { config, option, insights: buildScatterInsights(series[0]?.data ?? []) };
+    const themedOption = theme ? applyChartTheme(option, theme) : option;
+    return { config, option: themedOption, insights: buildScatterInsights(series[0]?.data ?? []) };
   }
 
   if (!config.rowField) return null;
@@ -312,9 +315,10 @@ export function buildAutoChartView(records: DataRecord[], config: AutoChartConfi
         { name: "80%", type: "line", yAxisIndex: 1, data: cumulative.map(() => 80), lineStyle: { type: "dashed", color: "#f59e0b" }, symbol: "none" }
       ]
     };
+    const themedOption = theme ? applyChartTheme(option, theme) : option;
     return {
       config,
-      option,
+      option: themedOption,
       insights: buildParetoInsights(categories, values, cumulative),
       table: categories.map((cat, i) => ({ Categoria: cat, Conteo: values[i], "Acumulado %": cumulative[i] }))
     };
@@ -335,9 +339,10 @@ export function buildAutoChartView(records: DataRecord[], config: AutoChartConfi
         emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0,0,0,0.2)" } }
       }]
     };
+    const themedOption = theme ? applyChartTheme(option, theme) : option;
     return {
       config,
-      option,
+      option: themedOption,
       insights: buildInsights(categories, values, config.chartType),
       table: categories.map((cat, i) => ({ Categoria: cat, Valor: values[i] }))
     };
@@ -364,9 +369,10 @@ export function buildAutoChartView(records: DataRecord[], config: AutoChartConfi
     }]
   };
 
+  const themedOption = theme ? applyChartTheme(option, theme) : option;
   return {
     config,
-    option,
+    option: themedOption,
     insights: buildInsights(categories, values, config.chartType),
     table: categories.map((cat, i) => ({ Categoria: cat, Valor: values[i] }))
   };

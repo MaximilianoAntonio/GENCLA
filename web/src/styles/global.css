@@ -412,6 +412,58 @@ button, input, select, textarea {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
+.diagram-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.4fr);
+  align-items: start;
+}
+
+.diagram-panel textarea,
+.diagram-panel input[type="text"] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  width: 100%;
+}
+
+.diagram-panel textarea:focus,
+.diagram-panel input[type="text"]:focus {
+  outline: 2px solid rgba(15, 118, 110, 0.25);
+  border-color: var(--primary);
+}
+
+.diagram-panel .section-title input[type="text"] {
+  max-width: 260px;
+}
+
+.editor-textarea {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.9rem;
+  min-height: 320px;
+}
+
+.editor-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.diagram-canvas {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  min-height: 420px;
+  background: var(--surface-alt);
+  overflow: auto;
+}
+
+.diagram-canvas svg {
+  width: 100%;
+  height: auto;
+}
+
 .notice {
   border-left: 4px solid var(--primary);
   padding: 12px 16px;
@@ -448,6 +500,12 @@ button, input, select, textarea {
   }
 
   .split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .diagram-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -22,6 +22,12 @@ export default function Home() {
           <Link to="/visualizador" className="btn btn-ghost">
             Ir al visualizador
           </Link>
+          <Link to="/ishikawa" className="btn btn-ghost">
+            Diagrama Ishikawa
+          </Link>
+          <Link to="/mermaid" className="btn btn-ghost">
+            Editor Mermaid
+          </Link>
         </div>
         {profile && (
           <span className="badge">
@@ -50,6 +56,19 @@ export default function Home() {
           <p>
             Documenta el proceso de limpieza, ideal para informes y estudios en
             Ingenieria Clinica.
+          </p>
+        </div>
+        <div className="card">
+          <h3>Ishikawa y causas raiz</h3>
+          <p>
+            Construye diagramas de causa y efecto con categorias editables y exporta
+            en PNG o SVG.
+          </p>
+        </div>
+        <div className="card">
+          <h3>Diagramas Mermaid</h3>
+          <p>
+            Redacta flujos y procesos con Mermaid y genera entregables visuales al instante.
           </p>
         </div>
       </div>

@@ -18,6 +18,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >Homologacion</NavLink>
           <NavLink to="/visualizador" className={({ isActive }) => (isActive ? "active" : "")}
             >Visualizador BI</NavLink>
+          <NavLink to="/ishikawa" className={({ isActive }) => (isActive ? "active" : "")}
+            >Ishikawa</NavLink>
+          <NavLink to="/mermaid" className={({ isActive }) => (isActive ? "active" : "")}
+            >Mermaid</NavLink>
         </nav>
         <div className="card" style={{ background: "rgba(255,255,255,0.08)", color: "#f8fafc" }}>
           <strong>Proyecto academico</strong>

@@ -4,6 +4,8 @@ import { AppShell } from "./components/AppShell";
 import { DataProvider } from "./store/DataContext";
 import Home from "./pages/Home";
 import Homologacion from "./pages/Homologacion";
+import Ishikawa from "./pages/Ishikawa";
+import MermaidPage from "./pages/Mermaid";
 import Visualizador from "./pages/Visualizador";
 
 export default function App() {
@@ -15,6 +17,8 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/homologacion" element={<Homologacion />} />
             <Route path="/visualizador" element={<Visualizador />} />
+            <Route path="/ishikawa" element={<Ishikawa />} />
+            <Route path="/mermaid" element={<MermaidPage />} />
           </Routes>
         </AppShell>
       </DataProvider>

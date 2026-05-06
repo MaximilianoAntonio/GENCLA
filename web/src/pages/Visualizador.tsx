@@ -7,6 +7,8 @@ import DataSummary from "../components/DataSummary";
 import DataTable from "../components/DataTable";
 import { AutoChartConfig, buildAutoChartView, recommendAutoCharts } from "../lib/autoCharts";
 import { aggregateBy, aggregatePivot, buildBoxplot, buildHeatmap, buildHistogram, buildScatter, computeStats, Metric } from "../lib/chartUtils";
+import { PALETTE_OPTIONS, PaletteName, getPalette } from "../lib/chartPalettes";
+import { applyChartTheme, ChartTheme, readChartTheme } from "../lib/chartTheme";
 import { exportCsv, filterRecords } from "../lib/dataUtils";
 import { TimeLevel } from "../lib/timeUtils";
 import { useDataContext } from "../store/DataContext";
@@ -30,19 +32,6 @@ type PieLabelFormat = "Porcentaje" | "Valor" | "Categoria + valor + %";
 
 type LabelPosition = "Exterior" | "Interior";
 
-const palette = [
-  "#ff6b6b",
-  "#4ecdc4",
-  "#ffd93d",
-  "#5d5fef",
-  "#f97f51",
-  "#1b9cfc",
-  "#f7b731",
-  "#2ed573",
-  "#9b59b6",
-  "#f39c12"
-];
-
 const timeLevels: TimeLevel[] = [
   "Sin transformacion",
   "Ano",
@@ -57,6 +46,8 @@ export default function Visualizador() {
   const { data, profile } = useDataContext();
   const chartRef = useRef<ReactECharts>(null);
   const [chartType, setChartType] = useState<ChartType>("Barras");
+  const [paletteName, setPaletteName] = useState<PaletteName>("Predeterminada");
+  const [chartTheme, setChartTheme] = useState<ChartTheme>(() => readChartTheme());
 
   const [rowField, setRowField] = useState("");
   const [rowFieldSecondary, setRowFieldSecondary] = useState("-- Ninguno --");
@@ -73,6 +64,8 @@ export default function Visualizador() {
   const [topN, setTopN] = useState(10);
   const [showZoom, setShowZoom] = useState(true);
   const [orderChrono, setOrderChrono] = useState(true);
+  const [orderAscending, setOrderAscending] = useState(false);
+  const [showSeriesLabels, setShowSeriesLabels] = useState(false);
 
   const [histColumn, setHistColumn] = useState("");
   const [histBins, setHistBins] = useState(12);
@@ -100,6 +93,12 @@ export default function Visualizador() {
   const [showPieHints, setShowPieHints] = useState(true);
   const [groupOthers, setGroupOthers] = useState(false);
   const [groupThreshold, setGroupThreshold] = useState(3);
+
+  const activePalette = useMemo(() => getPalette(paletteName), [paletteName]);
+
+  useEffect(() => {
+    setChartTheme(readChartTheme());
+  }, []);
 
   useEffect(() => {
     if (!profile) {
@@ -156,8 +155,11 @@ export default function Visualizador() {
   }, [data, profile]);
 
   const autoViews = useMemo(
-    () => autoCharts.map((config) => buildAutoChartView(data, config)).filter(Boolean),
-    [autoCharts, data]
+    () =>
+      autoCharts
+        .map((config) => buildAutoChartView(data, config, { palette: activePalette, theme: chartTheme }))
+        .filter(Boolean),
+    [autoCharts, data, activePalette, chartTheme]
   );
 
   const rowFields = useMemo(() => {
@@ -187,6 +189,11 @@ export default function Visualizador() {
       return { option: null as any, table: null as any, hints: [] as string[], notice: "" };
     }
 
+    const labelStyle = (position: "top" | "inside" = "top") =>
+      showSeriesLabels
+        ? { show: true, position, color: chartTheme.text, fontSize: 11 }
+        : { show: false };
+
     if (chartType === "Heatmap") {
       if (!rowField || heatmapColField === "-- Ninguno --") {
         return { option: null, table: null, hints: [], notice: "Selecciona columna de fila y columna para el mapa de calor." };
@@ -194,7 +201,7 @@ export default function Visualizador() {
       const result = buildHeatmap(filteredData, rowField, heatmapColField, metric, metric !== "Conteo" ? valueColumn : undefined, topN);
       if (result.rowLabels.length === 0) return { option: null, table: null, hints: [], notice: "Sin datos para el mapa de calor." };
       const hmOption = {
-        color: palette,
+        color: activePalette,
         tooltip: { position: "top", formatter: (p: any) => `${result.rowLabels[p.data[1]]} / ${result.colLabels[p.data[0]]}: <b>${p.data[2]}</b>` },
         grid: { top: 20, bottom: 90, left: 140, right: 20 },
         xAxis: { type: "category", data: result.colLabels, axisLabel: { rotate: 35 } },
@@ -202,7 +209,8 @@ export default function Visualizador() {
         visualMap: { min: 0, max: result.maxValue, calculable: true, orient: "horizontal", left: "center", bottom: 10, inRange: { color: ["#e0f8f4", "#0f766e"] } },
         series: [{ type: "heatmap", data: result.data, label: { show: result.rowLabels.length <= 8, fontSize: 10 } }]
       } as any;
-      return { option: hmOption, table: null, hints: [`Cruce de ${result.rowLabels.length} filas × ${result.colLabels.length} columnas.`], notice: "" };
+      const themedOption = applyChartTheme(hmOption, chartTheme);
+      return { option: themedOption, table: null, hints: [`Cruce de ${result.rowLabels.length} filas × ${result.colLabels.length} columnas.`], notice: "" };
     }
 
     if (chartType === "Boxplot") {
@@ -212,14 +220,15 @@ export default function Visualizador() {
       const result = buildBoxplot(filteredData, rowField, boxplotValueCol, topN);
       if (result.categories.length === 0) return { option: null, table: null, hints: [], notice: "Sin datos suficientes para boxplot." };
       const bpOption = {
-        color: palette,
+        color: activePalette,
         tooltip: { trigger: "item", formatter: (p: any) => `<b>${p.name}</b><br/>Min: ${p.data[1]}<br/>Q1: ${p.data[2]}<br/>Med: ${p.data[3]}<br/>Q3: ${p.data[4]}<br/>Max: ${p.data[5]}` },
         xAxis: { type: "category", data: result.categories, axisLabel: { rotate: 25 } },
         yAxis: { type: "value", name: boxplotValueCol },
         series: [{ name: boxplotValueCol, type: "boxplot", data: result.series, itemStyle: { color: "rgba(93,95,239,0.3)", borderColor: "#5d5fef" } }]
       } as any;
       const bpTable = result.categories.map((cat, i) => ({ Categoria: cat, Min: result.series[i][0], Q1: result.series[i][1], Mediana: result.series[i][2], Q3: result.series[i][3], Max: result.series[i][4] }));
-      return { option: bpOption, table: bpTable, hints: [`Distribución de "${boxplotValueCol}" por "${rowField}". Mediana más alta: "${result.categories[0]}".`], notice: "" };
+      const themedOption = applyChartTheme(bpOption, chartTheme);
+      return { option: themedOption, table: bpTable, hints: [`Distribución de "${boxplotValueCol}" por "${rowField}". Mediana más alta: "${result.categories[0]}".`], notice: "" };
     }
 
     if (chartType === "Histograma") {
@@ -229,7 +238,7 @@ export default function Visualizador() {
       const hist = buildHistogram(filteredData, histColumn, histBins);
       const stats = computeStats(filteredData, histColumn);
       const option = {
-        color: palette,
+        color: activePalette,
         tooltip: { trigger: "axis" },
         xAxis: { type: "category", data: hist.categories, axisLabel: { rotate: 25, color: "#1f2937" } },
         yAxis: { type: "value", axisLabel: { color: "#1f2937" } },
@@ -237,8 +246,9 @@ export default function Visualizador() {
       } as any;
       if (showZoom) option.dataZoom = [{ type: "inside" }, { type: "slider" }];
       const histHints = stats ? [`Media: ${stats.mean} | Mediana: ${stats.median} | Desv. Estándar: ${stats.stdDev} | Min: ${stats.min} | Max: ${stats.max}`] : [];
+      const themedOption = applyChartTheme(option, chartTheme);
       return {
-        option,
+        option: themedOption,
         table: hist.categories.map((label, index) => ({ Rango: label, Frecuencia: hist.values[index] })),
         hints: histHints,
         notice: ""
@@ -256,7 +266,7 @@ export default function Visualizador() {
         scatterColor === "-- Ninguno --" ? undefined : scatterColor
       );
       const option = {
-        color: palette,
+        color: activePalette,
         tooltip: { trigger: "item" },
         legend: { top: 10 },
         xAxis: {
@@ -278,8 +288,9 @@ export default function Visualizador() {
           symbolSize: 10
         }))
       } as any;
+      const themedOption = applyChartTheme(option, chartTheme);
 
-      return { option, table: null, hints: [], notice: "" };
+      return { option: themedOption, table: null, hints: [], notice: "" };
     }
 
     if (chartType === "Pareto") {
@@ -299,7 +310,7 @@ export default function Visualizador() {
       }, 0);
 
       const option = {
-        color: palette,
+        color: activePalette,
         tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
         legend: { top: 10 },
         xAxis: {
@@ -335,9 +346,10 @@ export default function Visualizador() {
           }
         ]
       } as any;
+      const themedOption = applyChartTheme(option, chartTheme);
 
       return {
-        option,
+        option: themedOption,
         table: categories.map((cat, index) => ({ Categoria: cat, Conteo: values[index], "Acumulado %": cumulative[index] })),
         hints: [],
         notice: ""
@@ -353,7 +365,7 @@ export default function Visualizador() {
       if (orderChrono && hasTime) {
         sorted.sort((a, b) => (a.sortKey ?? "").localeCompare(b.sortKey ?? ""));
       } else {
-        sorted.sort((a, b) => b.value - a.value);
+        sorted.sort((a, b) => (orderAscending ? a.value - b.value : b.value - a.value));
       }
       sorted = sorted.slice(0, topN);
 
@@ -407,7 +419,7 @@ export default function Visualizador() {
               ? "{b}\n{c} ({d}%)"
               : "{d}%";
         const option = {
-          color: palette,
+          color: activePalette,
           tooltip: { trigger: "item" },
           legend: { orient: "vertical", left: "left" },
           series: [
@@ -419,14 +431,16 @@ export default function Visualizador() {
               label: {
                 show: showPieLabels,
                 position: pieLabelPosition === "Exterior" ? "outside" : "inside",
-                formatter: labelFormat
+                formatter: labelFormat,
+                color: pieLabelPosition === "Exterior" ? chartTheme.text : "#ffffff"
               },
               labelLine: { show: showPieLabels && pieLabelPosition === "Exterior" }
             }
           ]
         } as any;
+        const themedOption = applyChartTheme(option, chartTheme);
         return {
-          option,
+          option: themedOption,
           table: categories.map((cat, index) => ({ Categoria: cat, Valor: values[index] })),
           hints,
           notice: ""
@@ -434,7 +448,7 @@ export default function Visualizador() {
       }
 
       const option = {
-        color: palette,
+        color: activePalette,
         tooltip: { trigger: "axis" },
         xAxis: {
           type: "category",
@@ -453,7 +467,8 @@ export default function Visualizador() {
             type: chartType === "Barras" ? "bar" : "line",
             data: values,
             smooth: chartType !== "Barras",
-            areaStyle: chartType === "Area" ? {} : undefined
+            areaStyle: chartType === "Area" ? {} : undefined,
+            label: labelStyle(chartType === "Barras" ? "top" : "top")
           }
         ]
       } as any;
@@ -462,8 +477,9 @@ export default function Visualizador() {
         option.dataZoom = [{ type: "inside" }, { type: "slider" }];
       }
 
+      const themedOption = applyChartTheme(option, chartTheme);
       return {
-        option,
+        option: themedOption,
         table: categories.map((cat, index) => ({ Categoria: cat, Valor: values[index] })),
         hints,
         notice: ""
@@ -479,7 +495,7 @@ export default function Visualizador() {
     if (orderChrono && hasTime) {
       orderedRows = [...rowEntries].sort((a, b) => a.key.localeCompare(b.key));
     } else {
-      orderedRows = [...rowEntries].sort((a, b) => b.total - a.total);
+      orderedRows = [...rowEntries].sort((a, b) => (orderAscending ? a.total - b.total : b.total - a.total));
     }
 
     orderedRows = orderedRows.slice(0, topN);
@@ -490,7 +506,7 @@ export default function Visualizador() {
     const columns = orderChrono && seriesFields.length > 0 ? [...pivot.columnKeys].sort() : pivot.columnKeys;
 
     const option = {
-      color: palette,
+      color: activePalette,
       tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
       legend: { top: 10 },
       xAxis: {
@@ -510,7 +526,8 @@ export default function Visualizador() {
         stack: chartType === "Barras" ? "total" : undefined,
         smooth: chartType !== "Barras",
         areaStyle: chartType === "Area" ? {} : undefined,
-        data: values.map((row) => row[colIndex] ?? 0)
+        data: values.map((row) => row[colIndex] ?? 0),
+        label: labelStyle(chartType === "Barras" ? "inside" : "top")
       }))
     } as any;
 
@@ -526,8 +543,9 @@ export default function Visualizador() {
       return row;
     });
 
+    const themedOption = applyChartTheme(option, chartTheme);
     return {
-      option,
+      option: themedOption,
       table,
       hints: chartType === "Pie" || chartType === "Dona" ? ["Pie y dona no aplican a series multiples."] : [],
       notice: ""
@@ -543,6 +561,7 @@ export default function Visualizador() {
     topN,
     showZoom,
     orderChrono,
+    orderAscending,
     histColumn,
     histBins,
     scatterX,
@@ -553,7 +572,10 @@ export default function Visualizador() {
     showPieHints,
     showPieLabels,
     pieLabelFormat,
-    pieLabelPosition
+    pieLabelPosition,
+    showSeriesLabels,
+    activePalette,
+    chartTheme
   ]);
 
   const canExport = Boolean(chartState.option);
@@ -569,7 +591,7 @@ export default function Visualizador() {
     if (!instance) {
       return null;
     }
-    return instance.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "#ffffff" });
+    return instance.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: chartTheme.background });
   };
 
   const handleExportPng = () => {
@@ -635,6 +657,8 @@ export default function Visualizador() {
     setRowTimeLevel(config.rowTimeLevel ?? "Sin transformacion");
     setOrderChrono(true);
   };
+
+  const supportsValueLabels = chartType === "Barras" || chartType === "Lineas" || chartType === "Area";
 
   if (!profile) {
     return (
@@ -974,6 +998,17 @@ export default function Visualizador() {
             )}
 
             <div className="field">
+              <label>Paleta de colores</label>
+              <select value={paletteName} onChange={(event) => setPaletteName(event.target.value as PaletteName)}>
+                {PALETTE_OPTIONS.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
               <label>Filtros por categoria</label>
               <select
                 multiple
@@ -1033,6 +1068,16 @@ export default function Visualizador() {
                 <input type="checkbox" checked={showZoom} onChange={(event) => setShowZoom(event.target.checked)} />
                 Zoom interactivo
               </label>
+              {supportsValueLabels && (
+                <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={showSeriesLabels}
+                    onChange={(event) => setShowSeriesLabels(event.target.checked)}
+                  />
+                  Etiquetas de valor
+                </label>
+              )}
               <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <input
                   type="checkbox"
@@ -1040,6 +1085,14 @@ export default function Visualizador() {
                   onChange={(event) => setOrderChrono(event.target.checked)}
                 />
                 Orden cronologico
+              </label>
+              <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={orderAscending}
+                  onChange={(event) => setOrderAscending(event.target.checked)}
+                />
+                Orden ascendente (valores)
               </label>
             </div>
 
